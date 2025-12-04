@@ -2,25 +2,108 @@
 title: "Biol806_FinalProject"
 author: "Nora Fried"
 format: pdf
+editor_options: 
+  chunk_output_type: console
 ---
 
-## Quarto
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
 ```{r}
-1 + 1
+#load packages and data
+library(tidyverse) # loads dplyr, ggplot, and other helpful data processing tools
+library(vegan) # for dissimilarity metrics and other ecological functions
+library(ape) # ape has a nice function for computing pcoas that has a little more functionality than cmdscale() in base R stats package
+library(ggrepel) # optional - nice to help keep labels on ggplots from running into each other
+
+RunA <- read.csv("Textseqtab_wTax_mctoolsr_RunA_7.29.24.csv")
+RunB <- read.csv("seqtab_wTax_mctoolsr_RunB_9.16.25.csv")
+
+# Rename the in the columns in the table
+colnames(RunA) <- gsub("^X", "", colnames(RunA))
+colnames(RunB) <- gsub("^X", "", colnames(RunB))
+
+RunA2 <- RunA
+rownames(RunA2) <- RunA2[,1]# set ASV IDs as rownames
+RunA2 <- RunA2[,-1]# get rid of first column
+
+RunB2 <- RunB
+rownames(RunB2) <- RunB2[,1]# set ASV IDs as rownames
+RunB2 <- RunB2[,-1]# get rid of first column
+
+# Transform ASV table so species are columns and rows are samples - this is the default that vegan and most other non-microbial ecological packages expects
+RunA_Wide <- t(RunA2) # this converts from dataframe into matrix format
+RunB_Wide <- t(RunB2)
+
 ```
 
-You can add options to executable code like this 
+```{r}
+RunA2_counts <- RunA2[, sapply(RunA2, is.numeric)] #removes taxonomy "character" row
+
+# Figure out rarefaction level
+summary(colSums(RunA2_counts)) #min is 2, how does rarefying work in this case? Most of the counts are less than 50,000 what is the usual standard for something like this? 
+
+data.frame(SampleTotCounts = colSums(RunA2_counts)) %>%
+  ggplot(aes(x = SampleTotCounts)) +
+  geom_histogram(fill = "steelblue", color = "black") +
+  theme_bw() +
+  labs(
+    x = "Total Sample Reads",
+    y = "Count")
+```
+
+
+```{r}
+RunB2_counts <- RunB2[, sapply(RunB2, is.numeric)] #removes taxonomy "character" row
+
+# Figure out rarefaction level
+summary(colSums(RunB2_counts)) #min is 370, how does rarefying work in this case? Many more reads than in Run A, what does this mean for combining them? 
+
+data.frame(SampleTotCounts = colSums(RunB2_counts)) %>%
+  ggplot(aes(x = SampleTotCounts)) +
+  geom_histogram(fill = "steelblue", color = "black") +
+  scale_x_continuous(labels = scales::comma) +
+  theme_bw() +
+  labs(
+    x = "Total Sample Reads",
+    y = "Count")
+```
+
+# From base code, have not rarefied yet because I am uncertain about values
+rar_level = 58688
+data.frame(SampleTotCounts = colSums(gp_otu_df)) %>%
+  ggplot(aes(x = SampleTotCounts)) +
+  geom_histogram() +
+  geom_vline(xintercept = rar_level, color = "red")
+
+# Rarefy data:
+gp_otu_df_t_rar <- rrarefy(gp_otu_df_t, rar_level)
+
+rowSums(gp_otu_df_t_rar) # check rarefying worked; all should have same read count = rar_level
+
+```{r}
+#Compute Bray-curtis dissimilarities distance matrices 
+# Bray-curtis dissimilarities
+RunA2_bc <- vegdist(x = RunA2_counts, method = "bray")
+
+```
+
+```{r}
+# PCOA oridination, with bray-curtis
+RunA2_bc.pcoa <- pcoa(RunA2_bc) # this is from the package ape; 
+#get this error, "Error: vector memory exhausted (limit reached?)"
+RunA2_bc.pct_ex <- round((RunA2_bc.pcoa$values$Relative_eig) * 100, 1) # this line computes the variation on each axis
+
+# NMDS oridination with bray-curtis
+RunA2_bc.nmds <-  metaMDS(RunA2_bc, k = 2, trymax = 100) # again, k = # of dimensions - though the impact of choosing k is slightly different in pcoa vs. nmds 
+```
+
+```{r}
+
+```
+
 
 ```{r}
 #| echo: false
 2 * 2
 ```
-
 The `echo: false` option disables the printing of code (only output is displayed).
