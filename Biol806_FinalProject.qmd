@@ -6,7 +6,21 @@ editor_options:
   chunk_output_type: console
 ---
 
+## Abstract
 
+This project uses long-term biodiversity data from the BioTIME global database to examine trends in passerine avian community structure within a sub-alpine birch forest near the town of Ammarnäs in northern Sweden. Data used in this project was originally documented by Enemar et al. 2004. The foundational Enemar et al. study provides a 37-year record of species diversity and abundance, enabling analysis of how community composition and dominance shifted over the course of the study period. For this project, I employed Shannon and Simpson diversity indices to quantify changes in community evenness and dominance, and applied linear models (lm) to test for temporal trends in these metrics. To complement community-level patterns, I also identified and compared both the three most abundant and three most rare bird species annually, to examine the relationship between shifts in a few dominant taxa and the whole community. Trends suggest relative stability across this population over the course of the study period, with a slight increase in individual species dominance. These analyses provide insight into long-term ecological dynamics in alpine and arctic bird communities and highlight the value of long-term biodiversity monitoring.
+
+## Introduction
+
+The Arctic is warming more rapidly than any other region on the planet and, as a result, Arctic ecosystems and their avian inhabitants are at disproportionately high risk of negative climate-change implications (IPCC 2023). Long-term bird monitoring provides a powerful lens for studying biodiversity change in northern ecosystems. Birds are sensitive indicators of environmental conditions as populations respond quickly to shifts in climate, habitat structure/suitability, and resource availability (Descamps et al., 2017). The 37-year dataset from Enemar et al. (2004) collected in a subalpine birch forest near Ammarnäs, Sweden, offers a rare opportunity to examine long-term community dynamics in a relatively undisturbed, high-latitude system. The previous analyses of this dataset focused on the role of temperature variability and predictable insect (Epirrita autumnata) outbreak cycles in shaping avian populations, successfully tying inter-annual population fluctuations to these environmental drivers.
+
+In this project, I use the Enemar et al. (2004) dataset, accessed through the BioTIME global biodiversity database (Biotime 2.0), to evaluate long-term trends in bird community structure independent of external climate or insect data. For this project, I analyze changes in species richness and abundance, Shannon diversity and Simpson dominance to quantify community-level shifts over time. I also assess whether these trends are driven by changes in a few dominant species by examining the abundance of the three most common and three least common bird species annually.
+
+This work is centered around two focus areas and guiding questions--- (1) species richness & diversity trends: How has species richness, evenness, and abundance changed over the course of the study? (2) species dynamics of most and least abundant species: How do trends of the three most abundant species fit into the bigger picture? How do rare species fit into these same trends?
+
+Together, these two main focus areas fit together nicely into one narrative about how community structure has changed through time.
+
+#### Background on the Enemar et al. (2004) study area and study methods:
 
 ```{r}
 #load packages and data
@@ -14,96 +28,289 @@ library(tidyverse) # loads dplyr, ggplot, and other helpful data processing tool
 library(vegan) # for dissimilarity metrics and other ecological functions
 library(ape) # ape has a nice function for computing pcoas that has a little more functionality than cmdscale() in base R stats package
 library(ggrepel) # optional - nice to help keep labels on ggplots from running into each other
+library(stringr)
 
-RunA <- read.csv("Textseqtab_wTax_mctoolsr_RunA_7.29.24.csv")
-RunB <- read.csv("seqtab_wTax_mctoolsr_RunB_9.16.25.csv")
+RunA <- read.csv("Textseqtab_wTax_mctoolsr_RunA_7.29.24.csv", check.names = FALSE) #check.names = FALSE gets rid of 'X' before column name
+RunB <- read.csv("seqtab_wTax_mctoolsr_RunB_9.16.25.csv", check.names = FALSE)
 
-# Rename the in the columns in the table
-colnames(RunA) <- gsub("^X", "", colnames(RunA))
-colnames(RunB) <- gsub("^X", "", colnames(RunB))
+if (colnames(RunA)[1] == "") colnames(RunA)[1] <- "ASV" #add ASV to first column name
+if (colnames(RunB)[1] == "") colnames(RunB)[1] <- "ASV" #add ASV to first column name
 
-RunA2 <- RunA
-rownames(RunA2) <- RunA2[,1]# set ASV IDs as rownames
-RunA2 <- RunA2[,-1]# get rid of first column
+#Extract and save taxonomy and associated ASV
+taxonomy_A <- RunA[, c("ASV", "taxonomy"), drop = FALSE]
+taxonomy_B <- RunB[, c("ASV", "taxonomy"), drop = FALSE]
+write.csv(taxonomy_A, "RunA_taxonomy.csv", row.names = FALSE)
+write.csv(taxonomy_B, "RunB_taxonomy.csv", row.names = FALSE)
+```
 
-RunB2 <- RunB
-rownames(RunB2) <- RunB2[,1]# set ASV IDs as rownames
-RunB2 <- RunB2[,-1]# get rid of first column
+#no overlaping sample ID's. This means we won't be able to statstically compare across our samples
 
-# Transform ASV table so species are columns and rows are samples - this is the default that vegan and most other non-microbial ecological packages expects
-RunA_Wide <- t(RunA2) # this converts from dataframe into matrix format
-RunB_Wide <- t(RunB2)
+```{r}
+#check for overlapping samples between runs
+runA_ids <- colnames(RunA)
+runB_ids <- colnames(RunB)
+
+runA_ids_clean <- runA_ids %>%
+  str_trim() %>% # remove leading/trailing spaces
+  toupper() %>% # make all uppercase
+  str_remove("_L\\d{3}$")#remove run suffixes like _L001
+
+runB_ids_clean <- runB_ids %>%
+  str_trim() %>%
+  toupper() %>%
+  str_remove("_L\\d{3}$")
+
+overlap_ids <- intersect(runA_ids_clean, runB_ids_clean)
+
+length(overlap_ids)  # number of overlapping samples (2)
+overlap_ids         # see which samples overlap (only ASV and Taxonomy columns)
 
 ```
 
 ```{r}
-RunA2_counts <- RunA2[, sapply(RunA2, is.numeric)] #removes taxonomy "character" row
+#Format data tables
+RunA2 <- RunA
+rownames(RunA2) <- RunA2$ASV
+RunA2$ASV <- NULL #makes ASVs bold row names
 
-# Figure out rarefaction level
-summary(colSums(RunA2_counts)) #min is 2, how does rarefying work in this case? Most of the counts are less than 50,000 what is the usual standard for something like this? 
+RunB2 <- RunB
+rownames(RunB2) <- RunB2$ASV
+RunB2$ASV <- NULL
+
+RunA2_counts <- RunA2[, sapply(RunA2, is.numeric)] #removes taxonomy "character" row (all rows should be numeric data now)
+RunB2_counts <- RunB2[, sapply(RunB2, is.numeric)] #removes taxonomy "character" row
+
+RunA2_counts <- RunA2_counts[, !(colnames(RunA2_counts) %in% c("74_S140_L001", "53_S135_L001"))]#removes problematic samples
+
+
+rownames(RunA2_counts) <- paste0(rownames(RunA2_counts), "_A")
+rownames(RunB2_counts) <- paste0(rownames(RunB2_counts), "_B")
+
+combined_counts <- bind_rows(
+  data.frame(SampleTotCounts = colSums(RunA2_counts), Run = "Run A"),
+  data.frame(SampleTotCounts = colSums(RunB2_counts), Run = "Run B"))
+
+# Transform ASV table so species are columns and rows are samples - this is the default that vegan and most other non-microbial ecological packages expects
+RunA2_t <- t(RunA2_counts) # this converts from dataframe into matrix format
+RunB2_t <- t(RunB2_counts)
+
+#rownames(RunA2_t) <- paste0(rownames(RunA2_t), "_A") #label with A
+#rownames(RunB2_t) <- paste0(rownames(RunB2_t), "_B") #label with B
+
+# Run A2_t as a df with SampleID column
+RunA_samples <- as.data.frame(RunA2_t)
+RunA_samples$SampleID <- rownames(RunA_samples)
+
+RunB_samples <- as.data.frame(RunB2_t)
+RunB_samples$SampleID <- rownames(RunB_samples)
+
+A_long <- RunA2_t %>%
+  as.data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  pivot_longer(-SampleID, names_to = "ASV", values_to = "count") %>%
+  mutate(Run = "A")
+
+B_long <- RunB2_t %>%
+  as.data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  pivot_longer(-SampleID, names_to = "ASV", values_to = "count") %>%
+  mutate(Run = "B")
+
+combined_long <- bind_rows(A_long, B_long)
+combined_wide <- combined_long %>%
+  pivot_wider(names_from = ASV, values_from = count, values_fill = 0)
+
+combined_numeric <- combined_wide %>%
+  column_to_rownames("SampleID") %>%
+  select(where(is.numeric))
+
+```
+
+```{r}
+# Figure out rarefaction level sample A
+summary(colSums(RunA2_counts)) #lots of very low reads, rarify to 500 and loose alot of samples 
 
 data.frame(SampleTotCounts = colSums(RunA2_counts)) %>%
   ggplot(aes(x = SampleTotCounts)) +
-  geom_histogram(fill = "steelblue", color = "black") +
+  geom_histogram(fill = "#FFBF29", color = "black") +
   theme_bw() +
   labs(
     x = "Total Sample Reads",
-    y = "Count")
+    y = "Count", 
+    title = "Read Depth Distribution Run A")
 ```
 
-
 ```{r}
-RunB2_counts <- RunB2[, sapply(RunB2, is.numeric)] #removes taxonomy "character" row
-
-# Figure out rarefaction level
-summary(colSums(RunB2_counts)) #min is 370, how does rarefying work in this case? Many more reads than in Run A, what does this mean for combining them? 
+# Figure out rarefaction level sample B
+summary(colSums(RunB2_counts)) #lots of very low reads, rarify to 500 and loose alot of samples 
 
 data.frame(SampleTotCounts = colSums(RunB2_counts)) %>%
   ggplot(aes(x = SampleTotCounts)) +
-  geom_histogram(fill = "steelblue", color = "black") +
+  geom_histogram(fill = "#14B49B", color = "black") +
   scale_x_continuous(labels = scales::comma) +
   theme_bw() +
   labs(
     x = "Total Sample Reads",
-    y = "Count")
+    y = "Count", 
+    title = "Read Depth Distribution Run B")
 ```
 
-# From base code, have not rarefied yet because I am uncertain about values
-rar_level = 58688
-data.frame(SampleTotCounts = colSums(gp_otu_df)) %>%
-  ggplot(aes(x = SampleTotCounts)) +
-  geom_histogram() +
-  geom_vline(xintercept = rar_level, color = "red")
+Need to describe why I am rarefying to 500
 
-# Rarefy data:
-gp_otu_df_t_rar <- rrarefy(gp_otu_df_t, rar_level)
+x-axis: SampleTotCounts = total number of sequencing reads per sample
 
-rowSums(gp_otu_df_t_rar) # check rarefying worked; all should have same read count = rar_level
+y-axis: count = number of samples that fall into that read-depth bin
+
+So your histogram is answering:
+
+"How many samples have X number of total reads?"
+
+This is a distribution of sequencing depth across all samples. Sample B is much more deeply sampled, A is lacking depth.
+
+```{r}
+#combined A and B plots
+rar_level = 1000
+
+ggplot(combined_counts, aes(x = SampleTotCounts, fill = Run)) +
+  geom_histogram(position = "identity", bins = 30, color = "black") +
+  scale_fill_manual(values = c("Run A" = "#FFBF29", "Run B" = "#14B49B")) +
+  geom_vline(xintercept = rar_level, color = "red") +
+  annotate("text",
+         x = rar_level,
+         y = max(table(cut(combined_counts$SampleTotCounts, 30))) * 1.05,
+         label = "1000 reads",
+         color = "red",
+         angle = 90,
+         hjust = 1,
+         vjust = 1.25) +
+  scale_x_continuous(labels = scales::comma) +
+  theme_bw() +
+  labs(
+    x = "Total Sample Reads",
+    y = "Count",
+    title = "Read Depth Distribution Run A & B")
+```
+
+```{r}
+#What percentage of samples are have below 1000 reads? 
+pct_below_1000 <- combined_counts %>%
+  summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
+
+#pct_below_1000_a&b <- combined_counts %>%
+  #group_by(Run) %>% 
+  #summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
+```
+
+Comparing raw counts directly is biased, because a sample with more reads will naturally have more observed taxa or features.
+
+To compare samples fairly, you need some form of normalization. This is rarefying. (Pick a target depth (e.g., 1000 reads per sample.) For each sample, randomly select that number of reads from the total pool. If a sample has fewer reads than the target, it is usually discarded.) This produces a dataset where all retained samples have the same total read count, which allows unbiased comparisons of diversity, richness, or community composition.
+
+By rarefying to such a low value (1000 is much lower than I normally would, 5000 is the lowest one should usually go) we keep more samples but may loose rare taxa. Since the goal of this exercise to to determine if we can combine the datasets, I have chosen a low value for rarefaction to try to keep as many samples as possible.
+
+So at a level of 1000, we are loosing `pct_below_1000` of the total samples when we rarefy to 1000 reads. 10.2% of RunA and 4.88% of RunB.
+
+```{r}
+# Rarefy data
+combined_rar <- rrarefy(combined_numeric, rar_level)
+
+rowSums(combined_rar) # check rarefying worked; all should have same read count = rar_level
+```
 
 ```{r}
 #Compute Bray-curtis dissimilarities distance matrices 
-# Bray-curtis dissimilarities
-RunA2_bc <- vegdist(x = RunA2_counts, method = "bray")
+
+combined_bc <- vegdist(x = combined_rar, method = "bray")
 
 ```
 
 ```{r}
-# PCOA oridination, with bray-curtis
-RunA2_bc.pcoa <- pcoa(RunA2_bc) # this is from the package ape; 
-#get this error, "Error: vector memory exhausted (limit reached?)"
-RunA2_bc.pct_ex <- round((RunA2_bc.pcoa$values$Relative_eig) * 100, 1) # this line computes the variation on each axis
+# PCOA ordination, with bray-curtis
+combined_pcoa <- pcoa(combined_bc) # this is from the package ape; 
+combined_pct <- round((combined_pcoa$values$Relative_eig) * 100, 1) # this line computes the variation on each axis
 
 # NMDS oridination with bray-curtis
-RunA2_bc.nmds <-  metaMDS(RunA2_bc, k = 2, trymax = 100) # again, k = # of dimensions - though the impact of choosing k is slightly different in pcoa vs. nmds 
+combined_nmds <-  metaMDS(combined_bc, k = 2, trymax = 100) # again, k = # of dimensions - though the impact of choosing k is slightly different in pcoa vs. nmds 
+combined_nmds <-  metaMDS(combined_bc, k = 2, trymax = 100) 
+
+#PCoA table
+combined_pcoa_df <- combined_pcoa$vectors[,1:2] %>%
+  data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  dplyr::rename(PCOA1_BC = Axis.1, PCOA2_BC = Axis.2)
+
+# NMDS plotting table
+combined_nmds_df <- combined_nmds$points %>%
+  data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  dplyr::rename(MDS1_BC = MDS1, MDS2_BC = MDS2)
+
 ```
 
 ```{r}
+#Join the tables together? do we need to do this? 
+combined_plot_df <- combined_wide %>%
+  left_join(combined_nmds_df, by = "SampleID") %>%
+  left_join(combined_pcoa_df, by = "SampleID")
 
 ```
 
+NMDS with few points labeled. Sample 74_S140_L001 and 53_S135_L001 seem to be causing some trouble, remove them.
+
+```{r}
+ggplot(combined_plot_df, aes(x = MDS1_BC, y = MDS2_BC, color = Run)) +
+  geom_point(size = 3) +
+  geom_text_repel(aes(label = SampleID), 
+                  size = 3,   
+                  max.overlaps = 8, 
+                  box.padding = 0.5, 
+                  point.padding = 0.5) +
+  scale_color_manual(values = c("A" = "#FFBF29", "B" = "#14B49B")) +
+  theme_bw() +
+  labs(x = "NMDS1", y = "NMDS2")
+
+
+```
+
+```{r}
+ggplot(combined_plot_df, aes(x = PCOA1_BC, y = PCOA2_BC, color = Run)) +
+  geom_point(size = 3) +
+  # geom_text_repel(aes(label = SampleID), 
+  #                 size = 3,   
+  #                 max.overlaps = 8, 
+  #                 box.padding = 0.5, 
+  #                 point.padding = 0.5) +
+  scale_color_manual(values = c("A" = "#FFBF29", "B" = "#14B49B")) +
+  theme_bw() +
+  labs(x = "PCoA1", y = "PCoA2")
+```
+
+Run a PERMANOVA to compare RunA and RunB. Because there are no overlapping samples between RunA and RunB a PERMANOVA or any other statistical test comparing variation in RunA and RunB are confounded with differing sample biology. Any observed differences between the runs identified with statistical analysis could come from true biological differences, or technical differences between the sampling efforts. As a result, I cannot statistical test differences between the samples because they are completely distinct. I still ran a PERMANOVA.
+
+```{r}
+adonis2(combined_bc ~ Run, data = combined_plot_df)
+
+bd <- betadisper(combined_bc, combined_plot_df$Run) #betadispersion (assessing is dispersion is equal between plots)
+anova(bd)
+```
+
+"Runs A and B show a statistically significant but weak difference in community composition (PERMANOVA R² = 0.075, p = 0.001), and betadispersion confirmed that within-group variances do not differ (p = 0.256), indicating the observed differences reflect true shifts in centroid location rather than differences in dispersion."
+
+Next steps, additional within-run analysis: Alpha diversity per sample, Beta diversity among samples in RunA and separately in RunB. Additionally, I can re-run samples.
 
 ```{r}
 #| echo: false
 2 * 2
+
+#setting up plotting effects example: 
+
+nmds_plotting_effects <- list(
+  geom_point(size = 3, color = "steelblue"),
+  theme_bw(),
+  labs(x = "NMDS1", y = "NMDS2"))
+
+ggplot(RunA2_plot_df, aes(x = MDS1_BC, y = MDS2_BC)) +
+  nmds_plotting_effects +
+  geom_text_repel(aes(label = SampleID))
 ```
+
 The `echo: false` option disables the printing of code (only output is displayed).
