@@ -1,28 +1,44 @@
 ---
-title: "Biol806_FinalProject"
+title: "Microbial Communities in Alaskan Permafrost: Assessing the Compatibility of Genomic Data"
 author: "Nora Fried"
 format: pdf
 editor_options: 
   chunk_output_type: console
+bibliography: references.bib
 ---
 
 ## Abstract
 
-This project uses long-term biodiversity data from the BioTIME global database to examine trends in passerine avian community structure within a sub-alpine birch forest near the town of Ammarnäs in northern Sweden. Data used in this project was originally documented by Enemar et al. 2004. The foundational Enemar et al. study provides a 37-year record of species diversity and abundance, enabling analysis of how community composition and dominance shifted over the course of the study period. For this project, I employed Shannon and Simpson diversity indices to quantify changes in community evenness and dominance, and applied linear models (lm) to test for temporal trends in these metrics. To complement community-level patterns, I also identified and compared both the three most abundant and three most rare bird species annually, to examine the relationship between shifts in a few dominant taxa and the whole community. Trends suggest relative stability across this population over the course of the study period, with a slight increase in individual species dominance. These analyses provide insight into long-term ecological dynamics in alpine and arctic bird communities and highlight the value of long-term biodiversity monitoring.
+Arctic permafrost soils store vast amounts of organic carbon and are experiencing accelerated thaw under climate warming. This feedback loop has significant implications for global nutrient cycling. Microbial community composition and activity mediate the decomposition of previously frozen soil organic matter, releasing greenhouse gases such as CO$_2$ and CH$_4$, yet the relative influence of primary landscape drivers, such as glacial drift and sample depth, remains unclear. Here, I re-analyze soils from D.V. Bakke's master's thesis, assessing two new DNA datasets (RunA and RunB) produced by the re-sequencing of soil samples, with the aim of addressing prior methodological issues that limited D.V. Bakke's analysis. The primary question driving this analysis is whether or not the new DNA data from RunA and RunB can be reliably combined for downstream analyses. Data processing involved data cleaning, rarefaction to standardize sequencing depth, ordination and diversity analyses. This initial assessment exposed a variety of sampling issues within the dataset and provides guidance for next steps in analyzing Bakke's Alaskan permafrost soil samples.
 
 ## Introduction
 
-The Arctic is warming more rapidly than any other region on the planet and, as a result, Arctic ecosystems and their avian inhabitants are at disproportionately high risk of negative climate-change implications (IPCC 2023). Long-term bird monitoring provides a powerful lens for studying biodiversity change in northern ecosystems. Birds are sensitive indicators of environmental conditions as populations respond quickly to shifts in climate, habitat structure/suitability, and resource availability (Descamps et al., 2017). The 37-year dataset from Enemar et al. (2004) collected in a subalpine birch forest near Ammarnäs, Sweden, offers a rare opportunity to examine long-term community dynamics in a relatively undisturbed, high-latitude system. The previous analyses of this dataset focused on the role of temperature variability and predictable insect (Epirrita autumnata) outbreak cycles in shaping avian populations, successfully tying inter-annual population fluctuations to these environmental drivers.
+The Arctic is warming nearly four times faster than the global average, driving rapid environmental change across this sensitive ecosystem (@rantanen2022). One of the most significant consequences of warming is the thawing of permafrost, perennially frozen soils that have accumulated large reservoirs of soil organic carbons over thousands of years. Although permafrost regions cover only \~15% of the global land surface, they store more than twice as much carbon as the atmosphere (@schuur2015, @schuur2022). As permafrost thaws, these carbon pools are destabilized, creating a positive feedback to global climate change through the release of greenhouse gases (GHGs).
 
-In this project, I use the Enemar et al. (2004) dataset, accessed through the BioTIME global biodiversity database (Biotime 2.0), to evaluate long-term trends in bird community structure independent of external climate or insect data. For this project, I analyze changes in species richness and abundance, Shannon diversity and Simpson dominance to quantify community-level shifts over time. I also assess whether these trends are driven by changes in a few dominant species by examining the abundance of the three most common and three least common bird species annually.
+Microbes are central to this process of organic carbon degredation: as previously frozen organic matter becomes available, soil microbes rapidly metabolize it, releasing carbon dioxide (CO$_2$) and methane (CH$_4$) into the atmosphere (@mack2004). The composition and activity of microbial communities therefore directly influence the rate and magnitude of permafrost carbon cycling. Yet, microbial diversity across Arctic landscapes is highly heterogeneous, and the factors driving this variation remain poorly understood. In particular, geographic environmental gradients such as glacial drift and sample depth are likely to shape microbial community composition and diversity, but their relative contributions have not been systematically evaluated (@bakke2024).
 
-This work is centered around two focus areas and guiding questions--- (1) species richness & diversity trends: How has species richness, evenness, and abundance changed over the course of the study? (2) species dynamics of most and least abundant species: How do trends of the three most abundant species fit into the bigger picture? How do rare species fit into these same trends?
+Previous work by former UNH master's student D.V. Bakke in Dr. Jessica Ernakovich's lab investigated microbial communities in Arctic soil using microbial DNA extractions but methodological limitations and sequencing failures in Bakke's original sample set prevented robust statistical conclusions. To address these sampling issues, Bakke's soils were re-sequenced in the fall of 2025 by the Ernakovich lab, generating two new DNA datasets (RunA and RunB). The primary goal of the present study is to evaluate these new datasets and determine whether data from the two sequencing runs can be reliably combined for downstream analyses. Specifically, I ask whether the distributions of samples produced by RunA and RunB are similar enough to justify combining them. The analysis completed thus far involved a laborious process of data quality assurance, standardization of sequencing depth via rarefaction, and visualization through ordination and diversity analyses. 
 
-Together, these two main focus areas fit together nicely into one narrative about how community structure has changed through time.
+Building on these microbial datasets, the aim is to provide a foundation for future studies exploring the influence of glacial drift and sample depth on permafrost microbial communities in Alaska. By re-assessing Bakke's samples with improved data quality and analytical rigor, this work establishes a framework for investigating the drivers of permafrost microbial diversity and informs predictions of microbial-mediated carbon flux under a warming Arctic.
 
-#### Background on the Enemar et al. (2004) study area and study methods:
+## Methods:
+
+#### Sample collection and History
+
+Permafrost and active layer soil samples were collected from three distinct study sites on three different glacial drift deposits near Toolik Field Station, Alaska, in August 2021 by a team from UNH. Site soil materials range in age from 11,500 years to 125,000 years. Samples evaluated in this analysis are sourced from the oldest sampling site. See map below created by Fernando Montano Lopez for sample locations and glacial drift informatio (retrieved from Bakke, 2024). ![Map.](map.png)
+
+#### Data Pre-Processing
+
+PCR sample products were sent to the UNH Hubbard Center for Genome Studies during the fall of 2025 and sequenced to 2x250 base pare pair-end sequencing using Illumina Novaseq 6000. Amplicon sequencing data received back from UNH Hubbard Center was fed through the Ernaklovich lab's data2 pipeline on UNH's Premise supercomputer, transforming amplicon results and assigning ASV taxonomy to individual samples using Silva db v138 (@callahan2016, @holland-moritz2023). Data2 pipeline outputs were then fed into R and RStudio software for all additional manipulation.
+
+#### Data Processing in R and RStudio
+
+Data were imported into RStudio for processing and analysis. After initial data cleaning, the first step assess whether any samples were present in both RunA and RunB, as overlapping samples would allow for direct statistical comparison between sequencing runs. Unfortunately, no overlapping samples were detected, meaning that RunA and RunB contain completely distinct sets of samples. This absence of sample overlap limits the comparative analyses that can be performed, as any statistical differences detected between runs cannot be disentangled from underlying sample variation. Consequently, analyses were conducted separately for each run when necessary, with visual and descriptive comparisons used to evaluate sequencing depth, diversity, and community composition.
+
+Sequencing depth was examined for each run and the data were standardized through rarefaction to create fair comparisons of microbial richness and diversity across samples. Ordination analyses were then performed using Bray--Curtis dissimilarity metrics, visualized through Principal Coordinates Analysis (PCoA) and Non-metric Multidimensional Scaling (NMDS) to assess patterns of community similarity. PERMANOVA was also applied to test for differences in community composition between runs; however, statistical results should be interpreted with caution due to the absence of overlapping samples between RunA and RunB, meaning observed differences may reflect distinct sample sets rather than true differences in microbial community.
 
 ```{r}
+#| include: false
 #load packages and data
 library(tidyverse) # loads dplyr, ggplot, and other helpful data processing tools
 library(vegan) # for dissimilarity metrics and other ecological functions
@@ -43,9 +59,8 @@ write.csv(taxonomy_A, "RunA_taxonomy.csv", row.names = FALSE)
 write.csv(taxonomy_B, "RunB_taxonomy.csv", row.names = FALSE)
 ```
 
-#no overlaping sample ID's. This means we won't be able to statstically compare across our samples
-
 ```{r}
+#| include: false
 #check for overlapping samples between runs
 runA_ids <- colnames(RunA)
 runB_ids <- colnames(RunB)
@@ -68,6 +83,7 @@ overlap_ids         # see which samples overlap (only ASV and Taxonomy columns)
 ```
 
 ```{r}
+#| include: false
 #Format data tables
 RunA2 <- RunA
 rownames(RunA2) <- RunA2$ASV
@@ -81,7 +97,6 @@ RunA2_counts <- RunA2[, sapply(RunA2, is.numeric)] #removes taxonomy "character"
 RunB2_counts <- RunB2[, sapply(RunB2, is.numeric)] #removes taxonomy "character" row
 
 RunA2_counts <- RunA2_counts[, !(colnames(RunA2_counts) %in% c("74_S140_L001", "53_S135_L001"))]#removes problematic samples
-
 
 rownames(RunA2_counts) <- paste0(rownames(RunA2_counts), "_A")
 rownames(RunB2_counts) <- paste0(rownames(RunB2_counts), "_B")
@@ -126,9 +141,15 @@ combined_numeric <- combined_wide %>%
 
 ```
 
-```{r}
+## Results and Discussion
+
+Examining the distribution of sequencing depth, RunA and RunB exhibited substantial differences. The majority of samples in RunA had fewer than 50,000 reads (Figure 1), whereas RunB samples generally had much higher read counts, often hundreds of thousands (Figure 2). These differences in read depth are important to consider because they influence diversity analyses and ordination results. See RunA (above) and RunB (below) data distribution summary below highlighting these differences.
+
+```{r fig.cap="RunA DNA reads distribution depth, majority of samples have less than 50000 reads.", fig.align='center', out.width='100%'}
+#| message: false
+#| echo: false
 # Figure out rarefaction level sample A
-summary(colSums(RunA2_counts)) #lots of very low reads, rarify to 500 and loose alot of samples 
+summary(colSums(RunA2_counts)) #lots of very low reads, rarify to 1000
 
 data.frame(SampleTotCounts = colSums(RunA2_counts)) %>%
   ggplot(aes(x = SampleTotCounts)) +
@@ -140,7 +161,9 @@ data.frame(SampleTotCounts = colSums(RunA2_counts)) %>%
     title = "Read Depth Distribution Run A")
 ```
 
-```{r}
+```{r fig.cap="RunB DNA reads distribution depth, RunB is much more deeply sampled than RunA with many samples having hundreds of thousands of reads.", fig.align='center', out.width='100%'}
+#| message: false
+#| echo: false
 # Figure out rarefaction level sample B
 summary(colSums(RunB2_counts)) #lots of very low reads, rarify to 500 and loose alot of samples 
 
@@ -155,19 +178,26 @@ data.frame(SampleTotCounts = colSums(RunB2_counts)) %>%
     title = "Read Depth Distribution Run B")
 ```
 
-Need to describe why I am rarefying to 500
-
-x-axis: SampleTotCounts = total number of sequencing reads per sample
-
-y-axis: count = number of samples that fall into that read-depth bin
-
-So your histogram is answering:
-
-"How many samples have X number of total reads?"
-
-This is a distribution of sequencing depth across all samples. Sample B is much more deeply sampled, A is lacking depth.
-
 ```{r}
+#| include: false
+#What percentage of samples are have below 1000 reads? 
+pct_below_1000 <- combined_counts %>%
+  summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
+
+#pct_below_1000_a&b <- combined_counts %>%
+  #group_by(Run) %>% 
+  #summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
+```
+
+Comparing raw sequencing counts between two different sequencing runs directly is inherently biased, as samples with higher read counts (ie. RunB) will appear to contain an increased diversity of microbial taxa. To enable fair comparisons across RunA and RunB, normalization is required; in this study, this was accomplished through rarefaction. Rarefaction involves selecting a target read depth (in this case, 1,000 reads per sample) and randomly subsampling each sample to that depth. Samples with fewer reads than the target are typically excluded, in this case 8.56% of samples are dropped during rarefaction. This subsampling procedure results in a dataset in which all retained samples have the same total read count, allowing unbiased comparisons of microbial richness, diversity, and community composition. Although a rarefaction depth of 1,000 reads is lower than what is typically recommended (5000 reads is often considered a minimum), it was chosen here to maximize the number of samples retained. Since the primary goal of this analysis is to determine whether the datasets from RunA and RunB can be combined, prioritizing sample retention over capturing rare taxa was appropriate for this pre-analysis. See Figure 3 for combined sample reads with rarefaction level.
+
+To examine patterns of microbial community composition across samples, I calculated dissimilarities using the Bray--Curtis index, a metric that quantifies differences in community composition based on the relative abundance of taxa. These dissimilarity matrices were then visualized using two ordination methods: Principal Coordinates Analysis (PCoA) (Figure 4) and Non-metric Multidimensional Scaling (NMDS) (Figure 5). PCoA provides a metric-based ordination that preserves the actual distances between samples (as much as is possible in a reduced number of dimensions) while NMDS is a rank-based approach preserving the rank order of dissimilarities. Together, these ordination techniques allow for the visualization of community similarities and differences among samples, helping to identify potential clustering by sequencing run, sample depth, or other environmental factors.
+
+Both the PCoA and NMDS analyses visually suggest substantial differences between the microbial communities represented in RunA and RunB. Unfortunately, statistical comparison of these runs is fundamentally limited because, again there are no overlapping samples between the runs. Despite this limitation, I conducted a PERMANOVA in an exploratory capacity, with the goal of determining whether the analysis could offer any additional insight into the data or help guide next steps for evaluating the two sequencing runs. PERMANOVA results below. 
+
+```{r fig.cap="Combined sequencing depth with rarefaction level denoted at 1000 reads.", fig.align='center', out.width='100%'}
+#| message: false
+#| echo: false
 #combined A and B plots
 rar_level = 1000
 
@@ -192,24 +222,7 @@ ggplot(combined_counts, aes(x = SampleTotCounts, fill = Run)) +
 ```
 
 ```{r}
-#What percentage of samples are have below 1000 reads? 
-pct_below_1000 <- combined_counts %>%
-  summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
-
-#pct_below_1000_a&b <- combined_counts %>%
-  #group_by(Run) %>% 
-  #summarize(pct_below_1000 = mean(SampleTotCounts < 1000) * 100)
-```
-
-Comparing raw counts directly is biased, because a sample with more reads will naturally have more observed taxa or features.
-
-To compare samples fairly, you need some form of normalization. This is rarefying. (Pick a target depth (e.g., 1000 reads per sample.) For each sample, randomly select that number of reads from the total pool. If a sample has fewer reads than the target, it is usually discarded.) This produces a dataset where all retained samples have the same total read count, which allows unbiased comparisons of diversity, richness, or community composition.
-
-By rarefying to such a low value (1000 is much lower than I normally would, 5000 is the lowest one should usually go) we keep more samples but may loose rare taxa. Since the goal of this exercise to to determine if we can combine the datasets, I have chosen a low value for rarefaction to try to keep as many samples as possible.
-
-So at a level of 1000, we are loosing `pct_below_1000` of the total samples when we rarefy to 1000 reads. 10.2% of RunA and 4.88% of RunB.
-
-```{r}
+#| include: false
 # Rarefy data
 combined_rar <- rrarefy(combined_numeric, rar_level)
 
@@ -217,6 +230,7 @@ rowSums(combined_rar) # check rarefying worked; all should have same read count 
 ```
 
 ```{r}
+#| include: false
 #Compute Bray-curtis dissimilarities distance matrices 
 
 combined_bc <- vegdist(x = combined_rar, method = "bray")
@@ -224,6 +238,7 @@ combined_bc <- vegdist(x = combined_rar, method = "bray")
 ```
 
 ```{r}
+#| include: false
 # PCOA ordination, with bray-curtis
 combined_pcoa <- pcoa(combined_bc) # this is from the package ape; 
 combined_pct <- round((combined_pcoa$values$Relative_eig) * 100, 1) # this line computes the variation on each axis
@@ -247,31 +262,17 @@ combined_nmds_df <- combined_nmds$points %>%
 ```
 
 ```{r}
-#Join the tables together? do we need to do this? 
+#| include: false
+#Join the tables together
 combined_plot_df <- combined_wide %>%
   left_join(combined_nmds_df, by = "SampleID") %>%
   left_join(combined_pcoa_df, by = "SampleID")
 
 ```
 
-NMDS with few points labeled. Sample 74_S140_L001 and 53_S135_L001 seem to be causing some trouble, remove them.
-
-```{r}
-ggplot(combined_plot_df, aes(x = MDS1_BC, y = MDS2_BC, color = Run)) +
-  geom_point(size = 3) +
-  geom_text_repel(aes(label = SampleID), 
-                  size = 3,   
-                  max.overlaps = 8, 
-                  box.padding = 0.5, 
-                  point.padding = 0.5) +
-  scale_color_manual(values = c("A" = "#FFBF29", "B" = "#14B49B")) +
-  theme_bw() +
-  labs(x = "NMDS1", y = "NMDS2")
-
-
-```
-
-```{r}
+```{r fig.cap="PCoA of Combined Samples.", fig.align='center', out.width='100%'}
+#| message: false
+#| echo: false
 ggplot(combined_plot_df, aes(x = PCOA1_BC, y = PCOA2_BC, color = Run)) +
   geom_point(size = 3) +
   # geom_text_repel(aes(label = SampleID), 
@@ -284,33 +285,36 @@ ggplot(combined_plot_df, aes(x = PCOA1_BC, y = PCOA2_BC, color = Run)) +
   labs(x = "PCoA1", y = "PCoA2")
 ```
 
-Run a PERMANOVA to compare RunA and RunB. Because there are no overlapping samples between RunA and RunB a PERMANOVA or any other statistical test comparing variation in RunA and RunB are confounded with differing sample biology. Any observed differences between the runs identified with statistical analysis could come from true biological differences, or technical differences between the sampling efforts. As a result, I cannot statistical test differences between the samples because they are completely distinct. I still ran a PERMANOVA.
+```{r fig.cap="NMDS of Combined Samples.", fig.align='center', out.width='100%'}
+#| message: false
+#| echo: false
+ggplot(combined_plot_df, aes(x = MDS1_BC, y = MDS2_BC, color = Run)) +
+  geom_point(size = 3) +
+  # geom_text_repel(aes(label = SampleID), 
+  #                 size = 3,   
+  #                 max.overlaps = 8, 
+  #                 box.padding = 0.5, 
+  #                 point.padding = 0.5) +
+  scale_color_manual(values = c("A" = "#FFBF29", "B" = "#14B49B")) +
+  theme_bw() +
+  labs(x = "NMDS1", y = "NMDS2")
+```
 
 ```{r}
+#| message: false
+#| echo: false
 adonis2(combined_bc ~ Run, data = combined_plot_df)
 
-bd <- betadisper(combined_bc, combined_plot_df$Run) #betadispersion (assessing is dispersion is equal between plots)
+bd <- betadisper(combined_bc, combined_plot_df$Run) #betadispersion
 anova(bd)
 ```
 
-"Runs A and B show a statistically significant but weak difference in community composition (PERMANOVA R² = 0.075, p = 0.001), and betadispersion confirmed that within-group variances do not differ (p = 0.256), indicating the observed differences reflect true shifts in centroid location rather than differences in dispersion."
+Results from the PERMANOVA suggest that RunA and RunB show a statistically significant but weak difference in community composition (PERMANOVA R² = 0.075, p = 0.001), and betadispersion confirmed that within-group variances do not differ (p = 0.256). However, because the two runs contain completely distinct sets of samples, this result remains inconclusive - further emphasizing that that overlapping samples are the key to determining if these two data runs can be combined.
 
-Next steps, additional within-run analysis: Alpha diversity per sample, Beta diversity among samples in RunA and separately in RunB. Additionally, I can re-run samples.
+## Conclusions
 
-```{r}
-#| echo: false
-2 * 2
+The primary goal of this analysis was to evaluate two newly generated sequencing datasets (RunA and RunB) derived from the re-sequencing of soil samples originally analyzed in D.V. Bakke's master's thesis @bakke2024. Through examination of sample read-depth distribution, rarefaction, and plotted ordinations, this work attempts to address whether the two runs could be reliably combined for downstream ecological analyses. The results suggest clear visual differences between RunA and RunB in sequencing depth and community structure; however, because the runs share no overlapping samples, it is impossible to distinguish whether these differences reflect true biological variation or variation elsewhere along the sampling pipeline. The current evidence suggests that the two datasets should not be combined.
 
-#setting up plotting effects example: 
+Moving forward, the most critical next step is generating overlapping samples across sequencing runs so that said variation can be statiscally evaluated. Establishing sequencing overlap will determine whether RunA and RunB can ultimately be merged into a unified dataset suitable for re-analyzing Bakke's original ecological hypotheses related to glacial drift and soil depth. In the meantime, each run can be futher analyzed independently to investigate within-run ecological patterns, including Shannon and Simpson diversity, which can provide additional insight into microbial community structure and variability within each dataset.
+\newpage
 
-nmds_plotting_effects <- list(
-  geom_point(size = 3, color = "steelblue"),
-  theme_bw(),
-  labs(x = "NMDS1", y = "NMDS2"))
-
-ggplot(RunA2_plot_df, aes(x = MDS1_BC, y = MDS2_BC)) +
-  nmds_plotting_effects +
-  geom_text_repel(aes(label = SampleID))
-```
-
-The `echo: false` option disables the printing of code (only output is displayed).

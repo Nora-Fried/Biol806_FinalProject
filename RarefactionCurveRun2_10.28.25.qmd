@@ -1,0 +1,193 @@
+---
+title: "RarecationCurveCode_10.23.25"
+format: html
+editor: visual
+author: Margaret Davis
+editor_options: 
+  chunk_output_type: console
+---
+
+## Rarefaction Curves
+
+This is my attempt to generate rarefaction curves of the ARCSS 16S site characterization soil samples using Hannah's code "OO_initial_cleaning" from slack with help from Sam Bratsman. I am working with the second run of sequencing data that went through the dad2pipeline 9.16.25.
+
+## Hannah's Code
+
+Below I copy and pasted Hannah's "00_initial_cleaning" code for rarefaction curves. I got this code from the Ernakovich lab slack coding channel, and am not sure if this code also exists on Hannah's Github?
+
+Before running the code, I got a warning that some packages were not installed. So I am going to try to install those packages.
+
+```{r}
+#install.packages("ggrepel")
+```
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("vegan")
+```
+
+And then because was getting an error "could not find function %\>%", Sam searched for that error on google and said that it means I need to install the package `dplyr` So now I will install it
+
+```{r}
+#install.packages("dplyr")
+```
+
+And I don't have the libraries downloaded-so here is the code to fix that
+
+```{r}
+#install.packages("devtools")
+#devtools::install_github("leffj/mctoolsr")
+```
+
+Check that all other packages are successfully installed-and they were! Then try to read in the seq file.
+
+```{r}
+#suppressMessages({list all library things}) #to not print out the yes that is working notes in console
+library(mctoolsr)
+library(tidyverse)
+library(vegan)
+library(ggrepel) # for labels on plots; optional.
+
+##########################################################################
+### Read in tables and create mctoolsr object
+##########################################################################
+taxa_table <- read_tsv("Textseqtab_wTax_mctoolsr_RunA_7.29.24.txt", skip = 1,comment = "") %>%
+  rename(ASV_ID = 1)
+
+metadata <- data.frame(sample_name = colnames(taxa_table)[-1]) %>%
+  filter(sample_name != "taxonomy") %>%
+  mutate(original_sample_name = str_extract(sample_name, "[^_]+")) %>%
+  mutate(ControlSample = ifelse(grepl("Control", sample_name), "Control", "Sample")) #%>%
+  #left_join(thesis_samples, by = c("original_sample_name" = "sample_ID"))
+
+# mctoolsr object
+input_tab <- list(data_loaded = taxa_table %>% select(-taxonomy) %>% column_to_rownames(var = "ASV_ID"),
+                  map_loaded = metadata %>% mutate(SampleID = sample_name) %>% column_to_rownames("sample_name"), 
+              taxonomy_loaded = taxa_table %>% select(ASV_ID, taxonomy) %>%
+                separate(taxonomy, sep = ";", into = paste0("taxonomy", c(1:7))) %>%
+                column_to_rownames("ASV_ID"))
+
+
+# Get the number of sequences per sample
+sample_reads <- taxa_table %>% 
+  select(-ASV_ID, -taxonomy) %>%
+  colSums() %>% sort()
+
+
+sample_reads.df <- data.frame(sample_reads) %>%
+  rownames_to_column(var = "sample_name")
+
+(sample_reads.df %>%
+  mutate(SampleControl = ifelse(grepl("Control", sample_name), "Control", "Sample")) %>% 
+  ggplot(aes(y = sample_reads, x = SampleControl)) +
+  geom_boxplot() +
+  geom_point(position = "jitter", alpha = 0.5))
+
+sample_reads.df %>%
+  mutate(SampleControl = ifelse(grepl("Control", sample_name), "Control", "Sample")) %>%
+  filter(SampleControl == "Sample") %>%
+  ggplot(aes(x = sample_reads)) +
+  geom_histogram(bins=39) +
+  geom_vline(xintercept = 5000, color = "red")
+
+# Rarefaction plots
+max_rare <- 200000
+
+rarefy_stops <- seq(100, max_rare, by = 25000)
+# sequence to cacluate rarefaction up to
+rar <- rarefy(t(input_tab$data_loaded), se = T, sample = rarefy_stops) # takes a long time to run; but gives se estimates
+
+# get data for rare curve plot
+rare_curve_plot <- rarecurve(t(input_tab$data_loaded), step = 25000, tidy = T)
+
+# extract curves
+rare_curve_tidy <- rare_curve_plot %>%
+  group_by(Site) %>% # grouping by sample
+  mutate(max_depth = max(Sample),
+         max_species = max(Species)) %>%
+  ungroup() %>%
+  mutate(bin = cut(max_depth, seq(min(max_depth), max(max_depth) + 4, length.out = 8), right = FALSE),
+         bin_proscribed = cut(max_depth, c(50000, 100000,125000, 150000, 175000, max(max_depth)), right = FALSE),
+         upper_bin = as.numeric(sub("[^,]*,([^]]*)\\)", "\\1", bin_proscribed)))
+#Sam has a bonus code step for getting rid of samples with not enough reads for a curve. Include if it helps! 
+#rare_curve_tidy <- na.omit(rare_curve_tidy)
+
+# Extract slopes at the top of each bin
+rar_slope_data <- rareslope(t(input_tab$data_loaded), sample = na.exclude(unique(rare_curve_tidy$upper_bin)))
+
+rare_slope_df <- rar_slope_data %>% data.frame() %>% rownames_to_column(var = "Site") %>% 
+  pivot_longer(-Site, names_to = "Rarefaction_level", values_to = "slope") %>%
+  mutate(Rarefaction_level = as.numeric(gsub("N", "", Rarefaction_level)))
+
+
+# Get plotting dataframe
+rare_curve_plot.df <- rare_curve_tidy %>%
+  full_join(rare_slope_df, by = c("upper_bin" = "Rarefaction_level", "Site"))
+
+# label low samples
+low_samples <- rare_curve_tidy %>% filter(max_depth <= max_rare)
+
+rar_slope_low_samples <- rar_slope_data %>% as.data.frame() %>% rownames_to_column(var = "Site") %>%
+  filter(Site %in% low_samples$Site) %>%
+  left_join(low_samples, by = "Site")
+
+# write out list of low samples in csv to be excel friendly
+write_csv(rar_slope_low_samples, file = "LowSampleReadList_9.16.25.csv")
+
+
+# plot
+rare_curves.plot <- rare_curve_plot.df %>%
+  filter(max_depth >= 500) %>% # optional, filter data by the maximum rarefaction you are thinking about
+  ggplot(., aes(x = Sample, y = Species, group = Site)) +
+  geom_line(aes(color = Site)) +
+  # geom_text_repel(data = rare_curve_plot.df %>%
+  #              #filter(max_depth <= max_rare) %>%
+  #              select(Site, max_species, upper_bin, slope) %>%
+  #              distinct() %>%
+  #              mutate(label = paste0("Slope: ", round(slope, digits = 2))),
+  #            x = 5000, aes( y = max_species, label = label)) +
+  facet_wrap(~Site) +
+#  scale_x_continuous(limits = c(0, max_rare*1.2)) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+rare_curves.plot
+
+
+
+rare_curve_plot
+
+
+
+
+###############################################################################
+###############################################################################
+rare_curve_plot.simple <- rare_curve_plot %>%
+  group_by(Site) %>%
+  mutate(max_depth = max(Sample),
+         max_species = max(Species))
+
+rar_slope_data <- rareslope(t(input_tab$data_loaded), sample = c(150000, 200000, 300000, 400000), )
+rare_slope_df <- rar_slope_data %>% data.frame() %>% rownames_to_column(var = "Site") %>% 
+  pivot_longer(-Site, names_to = "Rarefaction_level", values_to = "slope") %>%
+  mutate(Rarefaction_level = as.numeric(gsub("N", "", Rarefaction_level)))
+
+ggplot(rare_slope_df,
+       aes(x = Rarefaction_level, y = slope)) +
+  geom_point()
+
+View(rare_slope_df)
+
+ggplot(rare_curve_plot.simple, 
+       aes(x = Sample, y = Species, group = Site)) +
+  geom_line(aes(color = Site)) +
+  geom_text(data = rare_curve_plot.simple %>%
+              select(Site, max_species, max_depth) %>%
+              distinct(),
+            aes(x = max_depth, y = max_species, label = Site)) +
+  #facet_wrap(~upper_bin) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
